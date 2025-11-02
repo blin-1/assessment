@@ -1,16 +1,29 @@
 package com.example.tradeprocessor.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 import java.time.Instant;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InputTrade {
+    @NotBlank(message = "tradeId is required")
     private String tradeId;
+
+    @NotBlank(message = "accountNumber is required")
     private String accountNumber;
+
+    @NotBlank(message = "accountName is required")
     private String accountName;
+
+    @Positive(message = "amount must be greater than 0")
     private double amount;
+
+    @NotBlank(message = "currency is required")
     private String currency;
+
+    // optional - if missing we will set server time
     private Instant tradeDate;
 
     public String getTradeId() { return tradeId; }
