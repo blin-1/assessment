@@ -33,7 +33,6 @@ In CI you can either:
 - Use a JDK 21 image to match the target runtime exactly, or
 - Use a JDK 23 image (if available) and build with the same `mvn clean package` commands — the POM is set to compile with `--release 21` so produced artifacts will be Java 21-compatible.
 
-If you want, I can add a sample GitHub Actions workflow that sets up Java 23 for the build.
 CI status
 
 ![CI](https://github.com/blin-1/assessment/actions/workflows/ci.yml/badge.svg)
