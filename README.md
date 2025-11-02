@@ -33,7 +33,6 @@ In CI you can either:
 - Use a JDK 21 image to match the target runtime exactly, or
 - Use a JDK 23 image (if available) and build with the same `mvn clean package` commands — the POM is set to compile with `--release 21` so produced artifacts will be Java 21-compatible.
 
-If you want, I can add a sample GitHub Actions workflow that sets up Java 23 for the build.
 CI status
 
 ![CI](https://github.com/blin-1/assessment/actions/workflows/ci.yml/badge.svg)
@@ -41,5 +40,3 @@ CI status
 CI extras
 
 The workflow runs a matrix across Java 21 and Java 23 to validate both the target bytecode level (21) and the developer/runtime (23). Artifacts produced by each matrix cell are retained for 7 days and named with the Java version for easy retrieval.
-
-If you'd like different retention, additional matrix axes (OS, Maven versions), or artifact promotion steps, tell me and I can add them.
