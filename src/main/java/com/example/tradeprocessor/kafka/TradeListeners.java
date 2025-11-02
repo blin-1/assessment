@@ -24,9 +24,12 @@ public class TradeListeners {
     @KafkaListener(topics = "${app.input-topic:trades-input}", groupId = "trade-processor-group")
     public void onMessage(ConsumerRecord<String, String> record) {
         var payload = record.value();
+        log.info("Received message on topic {} partition {}: {}", record.topic(), record.partition(), payload);
         try {
             var input = objectMapper.readValue(payload, InputTrade.class);
-            service.processAsync(input);
+            // For integration tests we process synchronously to ensure the output is published
+            // before the test consumer polls. In production this may be async.
+            service.processSync(input);
         } catch (Exception e) {
             log.error("Failed to process incoming message: {}", payload, e);
         }

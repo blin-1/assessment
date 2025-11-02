@@ -40,3 +40,25 @@ CI status
 CI extras
 
 The workflow runs a matrix across Java 21 and Java 23 to validate both the target bytecode level (21) and the developer/runtime (23). Artifacts produced by each matrix cell are retained for 7 days and named with the Java version for easy retrieval.
+
+Docker & Kubernetes
+
+Build a container locally (example using Docker Desktop):
+
+```bash
+export JAVA_HOME="/c/Program Files/Java/jdk-23"
+export PATH="$JAVA_HOME/bin:$PATH"
+mvn -DskipTests package
+docker build -t ghcr.io/owner/assessment:latest .
+```
+
+Deploy to a Kubernetes cluster (example):
+
+```bash
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+```
+
+Notes:
+- The Kubernetes manifests assume a container image is available at `ghcr.io/owner/assessment:latest`. Replace the image with your registry and tag.
+- Prometheus scrape annotations are added to the Pod template to make metrics (Actuator Prometheus) discoverable.
