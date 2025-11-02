@@ -1,0 +1,10 @@
+app:
+  env: qa
+  description: "QA environment settings"
+
+server:
+  port: 8083
+
+logging:
+  level:
+    root: INFO

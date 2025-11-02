@@ -4,6 +4,10 @@
 
 This project is built with Maven and targets Java 21 bytecode level.
 
+Default Spring profile
+
+When no Spring profile is supplied, this project falls back to the `dev` profile by default (see `src/main/resources/application.yml`). You can still override the active profile with a Maven profile (for example `-Pdev`) or by setting the JVM/system property `-Dspring.profiles.active=qa`.
+
 The development machine used for verification in this repository has Oracle JDK 23 installed. You can build and test the project using that JDK while still compiling for Java 21 by using the Maven Compiler Plugin's `release` option (already configured in `pom.xml`).
 
 Local (Git Bash / WSL) quick-start

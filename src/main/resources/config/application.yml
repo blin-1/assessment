@@ -1,4 +1,7 @@
 spring:
+  # Default profile fallback when none is provided. Set explicitly with -Dspring.profiles.active
+  profiles:
+    default: dev
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
 

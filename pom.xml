@@ -12,6 +12,28 @@
         <spring.boot.version>3.1.8</spring.boot.version>
     </properties>
 
+    <!-- Maven profiles to simplify selecting Spring profiles during CI runs. -->
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+            </properties>
+        </profile>
+        <profile>
+            <id>qa</id>
+            <properties>
+                <spring.profiles.active>qa</spring.profiles.active>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+            </properties>
+        </profile>
+    </profiles>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -121,6 +143,11 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <configuration>
+                    <!-- Forward the selected Maven profile into the JVM when using spring-boot:run -->
+                    <fork>true</fork>
+                    <jvmArguments>-Dspring.profiles.active=${spring.profiles.active}</jvmArguments>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -137,6 +164,10 @@
                 <version>3.2.5</version>
                 <configuration>
                     <argLine>-Dnet.bytebuddy.experimental=true</argLine>
+                    <systemPropertyVariables>
+                        <!-- Ensure tests see the active Spring profile when a Maven profile is selected -->
+                        <spring.profiles.active>${spring.profiles.active}</spring.profiles.active>
+                    </systemPropertyVariables>
                     <!-- By default exclude long-running integration tests (tagged with @Tag("integration"))
                          so routine CI and local `mvn test` runs only execute fast unit tests. To run
                          integration tests explicitly use `-DincludeTags=integration` or set
@@ -166,6 +197,10 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.1.2</version>
                 <configuration>
+                    <systemPropertyVariables>
+                        <!-- Pass the active Spring profile into the integration-test JVMs as well -->
+                        <spring.profiles.active>${spring.profiles.active}</spring.profiles.active>
+                    </systemPropertyVariables>
                     <includes>
                         <include>**/*IT.java</include>
                     </includes>
