@@ -11,24 +11,30 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TradeProcessorService {
     private static final Logger log = LoggerFactory.getLogger(TradeProcessorService.class);
-
-    private final Map<String, CanonicalTrade> store = new ConcurrentHashMap<>();
+    // Use Spring Cache abstraction to store canonical records in-memory for auditing/retry.
+    // The cache name used is "canonicalStore" and defaults to a ConcurrentMap-backed cache
+    // when Spring Cache is enabled and no other CacheManager is configured.
+    private final CacheManager cacheManager;
+    
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
     @Value("${app.output-topic:trades-output}")
     private String outputTopic;
 
+    @Value("${app.instructions-outbound:instructions.outbound}")
+    private String instructionsOutboundTopic;
     /**
      * When {@code true} the service will block on kafkaTemplate.send() to make integration
      * tests deterministic. This flag is configured via application-test.properties for
@@ -38,9 +44,11 @@ public class TradeProcessorService {
     private boolean syncKafkaSend;
 
     public TradeProcessorService(KafkaTemplate<String, String> kafkaTemplate,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 CacheManager cacheManager) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.cacheManager = cacheManager;
     }
 
     /**
@@ -48,38 +56,93 @@ public class TradeProcessorService {
      */
     public String processSync(InputTrade input) {
         var canonical = toCanonical(input);
-        store.put(canonical.getId(), canonical);
+    // store canonical using Spring Cache
+        var cache = getCanonicalCache();
+        if (cache != null) {
+            cache.put(canonical.getId(), canonical);
+        }
         applyTransformations(canonical);
         var accounting = toAccounting(canonical);
         String payload = toJson(accounting);
-        var future = kafkaTemplate.send(outputTopic, canonical.getId(), payload);
+        var futureOut = kafkaTemplate.send(outputTopic, canonical.getId(), payload);
+        if (futureOut == null) {
+            log.warn("KafkaTemplate.send returned null for trade {} to {} - skipping publish callbacks", canonical.getId(), outputTopic);
+        }
+
+        // Build instructions payload JSON structure:
+        // {
+        //   "platform_id": "<raw account number>",
+        //   "trade": { "account": "<obfuscated>", "security": "<SEC>", "type": "B|S", "amount": <num>, "timestamp": "ISO_INSTANT" }
+        // }
+        var instrMap = new java.util.LinkedHashMap<String, Object>();
+        var tradeMap = new java.util.LinkedHashMap<String, Object>();
+        tradeMap.put("account", canonical.getAccountNumber());
+        tradeMap.put("security", canonical.getSecurityId());
+        tradeMap.put("type", canonical.getTradeType());
+        tradeMap.put("amount", canonical.getAmount());
+        tradeMap.put("timestamp", canonical.getTradeDate() == null ? null : canonical.getTradeDate().toString());
+        instrMap.put("platform_id", canonical.getRawAccountNumber());
+        instrMap.put("trade", tradeMap);
+
+        String instrPayload = toJson(instrMap);
+
+        var futureInstr = kafkaTemplate.send(instructionsOutboundTopic, canonical.getId(), instrPayload);
+        if (futureInstr == null) {
+            log.warn("KafkaTemplate.send returned null for trade {} to {} - skipping publish callbacks", canonical.getId(), instructionsOutboundTopic);
+        }
+
         if (syncKafkaSend) {
-            // In test mode block briefly to ensure the record is actually sent (makes tests deterministic)
+            // In test mode block briefly to ensure the records are actually sent (makes tests deterministic)
             try {
-                var result = future.get(10, java.util.concurrent.TimeUnit.SECONDS);
-                var meta = result.getRecordMetadata();
-                log.info("Processed trade {} -> published to {} (partition={}, offset={})",
-                        canonical.getId(), outputTopic, meta.partition(), meta.offset());
+                if (futureOut != null) {
+                    var result = futureOut.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    var meta = result.getRecordMetadata();
+                    log.info("Processed trade {} -> published to {} (partition={}, offset={})",
+                            canonical.getId(), outputTopic, meta.partition(), meta.offset());
+                }
+                if (futureInstr != null) {
+                    var result2 = futureInstr.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    var meta2 = result2.getRecordMetadata();
+                    log.info("Processed trade {} -> published to {} (partition={}, offset={})",
+                            canonical.getId(), instructionsOutboundTopic, meta2.partition(), meta2.offset());
+                }
             } catch (Exception e) {
-                log.error("Failed to publish trade {} to topic {}", canonical.getId(), outputTopic, e);
+                log.error("Failed to publish trade {} to topic(s) {} or {}", canonical.getId(), outputTopic, instructionsOutboundTopic, e);
                 // rethrow to make failures visible in tests
                 throw new RuntimeException(e);
             }
         } else {
-            // production: don't wait on the send future (fire-and-forget)
-            future.whenComplete((rec, ex) -> {
-                if (ex != null) {
-                    log.error("Async publish failed for trade {} to topic {}", canonical.getId(), outputTopic, ex);
-                } else {
-                    try {
-                        var meta = rec.getRecordMetadata();
-                        log.info("Processed trade {} -> published to {} (partition={}, offset={}) (async)",
-                                canonical.getId(), outputTopic, meta.partition(), meta.offset());
-                    } catch (Exception e) {
-                        log.info("Processed trade {} -> published to {} (async, metadata unavailable)", canonical.getId(), outputTopic);
+            // production: don't wait on the send futures (fire-and-forget)
+            if (futureOut != null) {
+                futureOut.whenComplete((rec, ex) -> {
+                    if (ex != null) {
+                        log.error("Async publish failed for trade {} to topic {}", canonical.getId(), outputTopic, ex);
+                    } else {
+                        try {
+                            var meta = rec.getRecordMetadata();
+                            log.info("Processed trade {} -> published to {} (partition={}, offset={}) (async)",
+                                    canonical.getId(), outputTopic, meta.partition(), meta.offset());
+                        } catch (Exception e) {
+                            log.info("Processed trade {} -> published to {} (async, metadata unavailable)", canonical.getId(), outputTopic);
+                        }
                     }
-                }
-            });
+                });
+            }
+            if (futureInstr != null) {
+                futureInstr.whenComplete((rec, ex) -> {
+                    if (ex != null) {
+                        log.error("Async publish failed for trade {} to topic {}", canonical.getId(), instructionsOutboundTopic, ex);
+                    } else {
+                        try {
+                            var meta = rec.getRecordMetadata();
+                            log.info("Processed trade {} -> published to {} (partition={}, offset={}) (async)",
+                                    canonical.getId(), instructionsOutboundTopic, meta.partition(), meta.offset());
+                        } catch (Exception e) {
+                            log.info("Processed trade {} -> published to {} (async, metadata unavailable)", canonical.getId(), instructionsOutboundTopic);
+                        }
+                    }
+                });
+            }
         }
         return canonical.getId();
     }
@@ -97,7 +160,9 @@ public class TradeProcessorService {
     }
 
     public CanonicalTrade getCanonical(String id) {
-        return store.get(id);
+        var cache = getCanonicalCache();
+        if (cache == null) return null;
+        return cache.get(id, CanonicalTrade.class);
     }
 
     public List<String> processBatch(List<InputTrade> inputs) {
@@ -108,13 +173,23 @@ public class TradeProcessorService {
         return ids;
     }
 
+    private Cache getCanonicalCache() {
+        if (cacheManager == null) return null;
+        return cacheManager.getCache("canonicalStore");
+    }
+
     private CanonicalTrade toCanonical(InputTrade in) {
         var c = new CanonicalTrade();
         c.setTradeId(in.getTradeId());
-        c.setAccountNumber(in.getAccountNumber());
+    // preserve raw account number for platform_id usage, but accountNumber will be
+    // obfuscated by applyTransformations
+    c.setRawAccountNumber(in.getAccountNumber());
+    c.setAccountNumber(in.getAccountNumber());
         c.setAccountName(in.getAccountName());
         c.setAmount(in.getAmount());
         c.setCurrency(in.getCurrency());
+        c.setSecurityId(in.getSecurityId());
+        c.setTradeType(in.getTradeType());
         c.setTradeDate(in.getTradeDate() == null ? Instant.now() : in.getTradeDate());
         return c;
     }
@@ -129,6 +204,52 @@ public class TradeProcessorService {
         var name = c.getAccountName();
         if (name != null && !name.isBlank()) {
             c.setAccountName(redactName(name));
+        }
+        // normalize security id: uppercase and validate
+        var sec = c.getSecurityId();
+        if (sec != null && !sec.isBlank()) {
+            var up = sec.trim().toUpperCase();
+            if (isValidSecurityId(up)) {
+                c.setSecurityId(up);
+            } else {
+                log.warn("Invalid security id '{}' for trade {} - clearing value", sec, c.getId());
+                c.setSecurityId(null);
+            }
+        }
+        // normalize trade type to standard codes (B/S)
+        var tt = c.getTradeType();
+        if (tt != null && !tt.isBlank()) {
+            var norm = normalizeTradeType(tt);
+            if (norm != null) {
+                c.setTradeType(norm);
+            } else {
+                log.warn("Unrecognized trade type '{}' for trade {} - clearing value", tt, c.getId());
+                c.setTradeType(null);
+            }
+        }
+    }
+
+    private boolean isValidSecurityId(String s) {
+        // Assumption: valid security id is 4-12 characters, uppercase alphanumeric or hyphen.
+        // This is intentionally permissive; adjust regex for stricter formats (ISIN/CUSIP) if required.
+        return s != null && s.matches("[A-Z0-9-]{4,12}");
+    }
+
+    private String normalizeTradeType(String t) {
+        if (t == null) return null;
+        var v = t.trim().toLowerCase();
+        if (v.startsWith("b")) return "B";
+        if (v.startsWith("s")) return "S";
+        // accept full words like 'buy'/'sell', also single-letter codes
+        switch (v) {
+            case "buy":
+            case "b":
+                return "B";
+            case "sell":
+            case "s":
+                return "S";
+            default:
+                return null;
         }
     }
 
@@ -152,12 +273,16 @@ public class TradeProcessorService {
     }
 
     private String maskAccount(String a) {
-        int keep = 4;
+        // Mask first 4 characters with asterisks, keep the rest
+        int mask = 4;
         int len = a.length();
-        if (len <= keep) return a;
+        if (len <= mask) {
+            // If account is 4 chars or less, mask all
+            return "*".repeat(len);
+        }
         var sb = new StringBuilder();
-        for (int i = 0; i < len - keep; i++) sb.append('*');
-        sb.append(a.substring(len - keep));
+        for (int i = 0; i < mask; i++) sb.append('*');
+        sb.append(a.substring(mask));
         return sb.toString();
     }
 

@@ -46,14 +46,62 @@ public class TradeController {
     public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
         var text = new String(file.getBytes());
         List<InputTrade> trades = new ArrayList<>();
-        // try parse as JSON array
-        try {
-            trades = objectMapper.readValue(text, new TypeReference<List<InputTrade>>(){});
-        } catch (Exception e) {
-            // fallback: newline separated JSON
-            for (var line : text.split("\\r?\\n")) {
-                if (line.isBlank()) continue;
-                trades.add(objectMapper.readValue(line, InputTrade.class));
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+
+        // If CSV (by filename or content type), parse CSV with Commons CSV. Otherwise try JSON parsing.
+        boolean isCsv = filename.endsWith(".csv") || contentType.contains("csv");
+        Map<Integer, List<String>> parseErrors = new HashMap<>();
+        if (isCsv) {
+            try (java.io.Reader reader = new java.io.StringReader(text)) {
+        var format = org.apache.commons.csv.CSVFormat.DEFAULT
+            .withFirstRecordAsHeader()
+            .withIgnoreSurroundingSpaces();
+                var parser = format.parse(reader);
+                var headerMap = parser.getHeaderMap();
+                for (org.apache.commons.csv.CSVRecord record : parser) {
+                    int originalRow = (int)record.getRecordNumber() - 1; // zero-based data row index
+                    try {
+                        var t = new InputTrade();
+                        // helper to fetch header values case-insensitively and with common variants
+                        String v;
+                        v = csvValue(record, headerMap, "tradeId", "trade_id", "tradeid");
+                        if (v != null && !v.isBlank()) t.setTradeId(stripQuotes(v));
+
+                        v = csvValue(record, headerMap, "accountNumber", "account_number", "accountnumber");
+                        if (v != null && !v.isBlank()) t.setAccountNumber(stripQuotes(v));
+
+                        v = csvValue(record, headerMap, "accountName", "account_name", "accountname");
+                        if (v != null && !v.isBlank()) t.setAccountName(stripQuotes(v));
+
+                        v = csvValue(record, headerMap, "amount");
+                        if (v != null && !v.isBlank()) t.setAmount(Double.parseDouble(stripQuotes(v)));
+
+                        v = csvValue(record, headerMap, "currency");
+                        if (v != null && !v.isBlank()) t.setCurrency(stripQuotes(v));
+
+                        v = csvValue(record, headerMap, "tradeDate", "trade_date", "tradedate");
+                        if (v != null && !v.isBlank()) t.setTradeDate(java.time.Instant.parse(stripQuotes(v)));
+
+                        trades.add(t);
+                    } catch (Exception e) {
+                        parseErrors.computeIfAbsent(originalRow, k -> new ArrayList<>()).add("parse error: " + e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                // entire CSV parse failed; fallback to JSON parsing below
+                trades.clear();
+            }
+        } else {
+            // try parse as JSON array
+            try {
+                trades = objectMapper.readValue(text, new TypeReference<List<InputTrade>>(){});
+            } catch (Exception e) {
+                // fallback: newline separated JSON
+                for (var line : text.split("\\r?\\n")) {
+                    if (line.isBlank()) continue;
+                    trades.add(objectMapper.readValue(line, InputTrade.class));
+                }
             }
         }
 
@@ -71,6 +119,11 @@ public class TradeController {
                 for (var v : violations) msgs.add(v.getPropertyPath() + ": " + v.getMessage());
                 errors.put(i, msgs);
             }
+        }
+
+        // merge parse errors (if any) into the errors map so callers see which rows failed to parse
+        for (var e : parseErrors.entrySet()) {
+            errors.put(e.getKey(), e.getValue());
         }
 
         Map<String, Object> resp = new HashMap<>();
@@ -94,5 +147,30 @@ public class TradeController {
         body.put("message", "Validation failed");
         body.put("errors", errors);
         return ResponseEntity.badRequest().body(body);
+    }
+
+    private String stripQuotes(String s) {
+        if (s == null) return "";
+        return s.trim().replaceAll("^\"|\"$", "");
+    }
+
+    // find a header in headerMap that matches any of the provided names (case-insensitive)
+    private String csvValue(org.apache.commons.csv.CSVRecord record, java.util.Map<String,Integer> headerMap, String... names) {
+        if (headerMap == null || headerMap.isEmpty()) return null;
+        for (String want : names) {
+            // try exact first
+            if (headerMap.containsKey(want)) {
+                try { return record.get(want); } catch (IllegalArgumentException ignored) {}
+            }
+        }
+        // try case-insensitive match
+        for (String key : headerMap.keySet()) {
+            for (String want : names) {
+                if (key.equalsIgnoreCase(want)) {
+                    try { return record.get(key); } catch (IllegalArgumentException ignored) {}
+                }
+            }
+        }
+        return null;
     }
 }

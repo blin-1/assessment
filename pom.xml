@@ -107,6 +107,12 @@
             <version>1.19.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- CSV parsing library -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.10.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -135,8 +141,44 @@
                          so routine CI and local `mvn test` runs only execute fast unit tests. To run
                          integration tests explicitly use `-DincludeTags=integration` or set
                          -DexcludeTags to change behavior at invocation time. -->
-                    <excludeTags>integration</excludeTags>
+                    <properties>
+                        <!-- JUnit Platform accepts configuration parameters for tag filtering.
+                             Use the junit.jupiter.execution.tags.exclude parameter to exclude
+                             integration-tagged tests by default. Developers can still run those
+                             tests explicitly with -DincludeTags=integration. -->
+                        <property>
+                            <name>junit.jupiter.execution.tags.exclude</name>
+                            <value>integration</value>
+                        </property>
+                    </properties>
+                    <!-- Also explicitly exclude classes that follow the *IntegrationTest naming
+                         convention so they don't run during the fast unit test phase. Integration
+                         tests will still run when invoked explicitly or when using the Failsafe
+                         plugin in an integration test job. -->
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
                 </configuration>
+            </plugin>
+            <!-- Failsafe plugin to run integration tests matching *IT.java during the verify phase -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.1.2</version>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

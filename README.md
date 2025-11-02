@@ -65,95 +65,50 @@ Notes:
 
 Integration tests (Kafka / Testcontainers)
 
-This project includes an end-to-end Kafka integration test that uses Testcontainers to start a local Kafka broker. The test is tagged and run separately because it requires Docker to be available.
+Integration tests in this project are implemented as IT classes (naming pattern: `*IT.java`) and are executed by the Maven Failsafe plugin during the `verify` phase. This keeps the fast `mvn test` run focused on unit tests (Surefire) while running longer Testcontainers-based end-to-end tests only when explicitly requested (for example in a CI integration job).
 
 Local requirements
-- Docker Desktop running and accessible to Testcontainers
-- Sufficient memory for the Kafka container (2GB+ recommended)
+- Docker Desktop (or another Docker runtime) accessible to Testcontainers
+- Sufficient memory for Kafka containers (2GB+ recommended)
 
-Run the Kafka integration test locally
+Run integration tests locally
 
-Activate the `test` Spring profile (the integration test already uses `@ActiveProfiles("test")`) and run the single test with Maven:
+- Run the full verify lifecycle, which executes Failsafe ITs:
 
 ```bash
-# run only the KafkaIntegrationTest
-mvn -Dtest=KafkaIntegrationTest test
+mvn verify
 ```
 
-If you'd prefer to run all unit tests (fast) and skip integration tests, use the `-DskipITs` or tag-based filtering in your CI to exclude tests marked with `@Tag("integration")`.
+- Run a single IT class via Failsafe (example `KafkaIT`):
+
+```bash
+mvn -Dit.test=KafkaIT verify
+```
+
+Run unit tests only (fast)
+
+```bash
+mvn test
+```
 
 CI guidance
 
-- Only run Kafka integration tests on runners that have Docker available. On GitHub Actions use a self-hosted runner or a job with Docker-in-Docker privileges.
-- Alternatively mark the test with `@Tag("integration")` and configure your CI workflow to run integration tests in a separate job with the required Docker support.
+- Run unit tests in a fast job using `mvn test`.
+- Run integration tests in a separate job that has Docker available and executes `mvn verify` (Failsafe will pick up `*IT.java` classes). Example: use a self-hosted or Docker-enabled runner for the integration job.
 
-Example GitHub Actions snippet (run integration tests on Docker-enabled runner):
-
-```yaml
-name: integration-tests
-on: [workflow_dispatch]
-jobs:
-	kafka-integration:
-		runs-on: self-hosted # or a runner image with Docker
-		steps:
-			- uses: actions/checkout@v4
-			- name: Set up JDK
-				uses: actions/setup-java@v4
-				with:
-					distribution: temurin
-					java-version: '23'
-			- name: Run Kafka integration tests
-				run: mvn -Dtest=KafkaIntegrationTest test
-```
-
-If you want, I can add CI config that runs integration tests behind a conditional or in a separate workflow.
-
-Excluding integration tests in CI
-
-You can keep integration tests (Testcontainers, Kafka) out of the default fast unit-test job by tagging them with JUnit tags (we use `@Tag("integration")`). Use Maven / Surefire tag filtering to exclude or include them in specific jobs:
-
-- Run unit tests only (exclude integration):
-
-```bash
-mvn -DexcludeTags=integration test
-```
-
-- Run integration tests only (separate CI job with Docker):
-
-```bash
-mvn -DincludeTags=integration test
-```
-
-Example GitHub Actions usage
-
-- Fast unit-test job (no Docker required):
+Example GitHub Actions snippet (integration job using `mvn verify`):
 
 ```yaml
-	unit-tests:
-		runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v4
-			- name: Set up JDK
-				uses: actions/setup-java@v4
-				with:
-					java-version: '23'
-			- name: Run unit tests (exclude integration)
-				run: mvn -DexcludeTags=integration test
+integration-tests:
+  runs-on: self-hosted # or a runner with Docker available
+  steps:
+	- uses: actions/checkout@v4
+	- name: Set up JDK
+	  uses: actions/setup-java@v4
+	  with:
+		java-version: '23'
+	- name: Run integration tests (Failsafe)
+	  run: mvn verify
 ```
 
-- Integration job (needs Docker / self-hosted or Docker-enabled runner):
-
-```yaml
-	integration-tests:
-		runs-on: self-hosted # or a runner with Docker available
-		steps:
-			- uses: actions/checkout@v4
-			- name: Set up JDK
-				uses: actions/setup-java@v4
-				with:
-					java-version: '23'
-			- name: Run integration tests
-				run: mvn -DincludeTags=integration test
-```
-
-Note: Surefire (3.x) supports `-DincludeTags` / `-DexcludeTags` for JUnit 5 tag filtering. You can also configure tag filtering in the `maven-surefire-plugin` configuration inside `pom.xml` if you want a default behavior there.
+If you want, I can add or adapt CI workflow files so unit and integration tests are split into separate jobs (fast unit-test job vs. Docker-enabled integration job).

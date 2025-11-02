@@ -7,10 +7,13 @@ public class CanonicalTrade {
     private String id = UUID.randomUUID().toString();
     private String tradeId;
     private String accountNumber;
+    private String rawAccountNumber;
     private String accountName;
     private double amount;
     private String currency;
     private Instant tradeDate;
+    private String securityId;
+    private String tradeType;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -18,6 +21,8 @@ public class CanonicalTrade {
     public void setTradeId(String tradeId) { this.tradeId = tradeId; }
     public String getAccountNumber() { return accountNumber; }
     public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+    public String getRawAccountNumber() { return rawAccountNumber; }
+    public void setRawAccountNumber(String rawAccountNumber) { this.rawAccountNumber = rawAccountNumber; }
     public String getAccountName() { return accountName; }
     public void setAccountName(String accountName) { this.accountName = accountName; }
     public double getAmount() { return amount; }
@@ -26,4 +31,8 @@ public class CanonicalTrade {
     public void setCurrency(String currency) { this.currency = currency; }
     public Instant getTradeDate() { return tradeDate; }
     public void setTradeDate(Instant tradeDate) { this.tradeDate = tradeDate; }
+    public String getSecurityId() { return securityId; }
+    public void setSecurityId(String securityId) { this.securityId = securityId; }
+    public String getTradeType() { return tradeType; }
+    public void setTradeType(String tradeType) { this.tradeType = tradeType; }
 }

@@ -34,4 +34,24 @@ public class TradeListeners {
             log.error("Failed to process incoming message: {}", payload, e);
         }
     }
+
+    @KafkaListener(topics = "instructions.inbound", groupId = "instruction-processor-group")
+    public void onInstruction(ConsumerRecord<String, String> record) {
+        var payload = record.value();
+        log.info("Received instruction on topic {} partition {}: {}", record.topic(), record.partition(), payload);
+        try {
+            var node = objectMapper.readTree(payload);
+            // If the instruction carries a trade payload, process it.
+            if (node.has("trade")) {
+                var tradeNode = node.get("trade");
+                var input = objectMapper.treeToValue(tradeNode, InputTrade.class);
+                // prefer async processing for instructions unless tests enable sync behavior
+                service.processAsync(input);
+            } else {
+                log.info("Instruction received with no trade payload: {}", node.toString());
+            }
+        } catch (Exception e) {
+            log.error("Failed to handle instruction payload: {}", payload, e);
+        }
+    }
 }

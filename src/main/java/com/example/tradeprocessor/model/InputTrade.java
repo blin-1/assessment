@@ -25,6 +25,8 @@ public class InputTrade {
 
     // optional - if missing we will set server time
     private Instant tradeDate;
+    private String securityId;
+    private String tradeType;
 
     public String getTradeId() { return tradeId; }
     public void setTradeId(String tradeId) { this.tradeId = tradeId; }
@@ -38,4 +40,8 @@ public class InputTrade {
     public void setCurrency(String currency) { this.currency = currency; }
     public Instant getTradeDate() { return tradeDate; }
     public void setTradeDate(Instant tradeDate) { this.tradeDate = tradeDate; }
+    public String getSecurityId() { return securityId; }
+    public void setSecurityId(String securityId) { this.securityId = securityId; }
+    public String getTradeType() { return tradeType; }
+    public void setTradeType(String tradeType) { this.tradeType = tradeType; }
 }
