@@ -10,6 +10,7 @@ This is an assessment repository used for testing and evaluation purposes.
 - Write clear, self-documenting code
 - Keep functions small and focused
 - Use meaningful variable and function names
+- Use streams, not loops
 
 ## Testing Guidelines
 
