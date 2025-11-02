@@ -29,7 +29,16 @@ public class TradeProcessorService {
     @Value("${app.output-topic:trades-output}")
     private String outputTopic;
 
-    public TradeProcessorService(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
+    /**
+     * When {@code true} the service will block on kafkaTemplate.send() to make integration
+     * tests deterministic. This flag is configured via application-test.properties for
+     * the "test" Spring profile (app.sync-kafka-send=true).
+     */
+    @Value("${app.sync-kafka-send:false}")
+    private boolean syncKafkaSend;
+
+    public TradeProcessorService(KafkaTemplate<String, String> kafkaTemplate,
+                                 ObjectMapper objectMapper) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
     }
@@ -43,8 +52,35 @@ public class TradeProcessorService {
         applyTransformations(canonical);
         var accounting = toAccounting(canonical);
         String payload = toJson(accounting);
-        kafkaTemplate.send(outputTopic, canonical.getId(), payload);
-        log.info("Processed trade {} -> published to {}", canonical.getId(), outputTopic);
+        var future = kafkaTemplate.send(outputTopic, canonical.getId(), payload);
+        if (syncKafkaSend) {
+            // In test mode block briefly to ensure the record is actually sent (makes tests deterministic)
+            try {
+                var result = future.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                var meta = result.getRecordMetadata();
+                log.info("Processed trade {} -> published to {} (partition={}, offset={})",
+                        canonical.getId(), outputTopic, meta.partition(), meta.offset());
+            } catch (Exception e) {
+                log.error("Failed to publish trade {} to topic {}", canonical.getId(), outputTopic, e);
+                // rethrow to make failures visible in tests
+                throw new RuntimeException(e);
+            }
+        } else {
+            // production: don't wait on the send future (fire-and-forget)
+            future.whenComplete((rec, ex) -> {
+                if (ex != null) {
+                    log.error("Async publish failed for trade {} to topic {}", canonical.getId(), outputTopic, ex);
+                } else {
+                    try {
+                        var meta = rec.getRecordMetadata();
+                        log.info("Processed trade {} -> published to {} (partition={}, offset={}) (async)",
+                                canonical.getId(), outputTopic, meta.partition(), meta.offset());
+                    } catch (Exception e) {
+                        log.info("Processed trade {} -> published to {} (async, metadata unavailable)", canonical.getId(), outputTopic);
+                    }
+                }
+            });
+        }
         return canonical.getId();
     }
 
