@@ -116,3 +116,62 @@ integration-tests:
 ```
 
 If you want, I can add or adapt CI workflow files so unit and integration tests are split into separate jobs (fast unit-test job vs. Docker-enabled integration job).
+
+Local API quick examples
+------------------------
+
+The development profile binds the app to port 8082 by default. Replace the host/port if you run with a different profile or override `server.port`.
+
+Health check
+
+```bash
+curl http://localhost:8082/actuator/health
+```
+
+OpenAPI / Swagger JSON
+
+```bash
+curl http://localhost:8082/v3/api-docs
+```
+
+Ingest a single trade (JSON)
+
+```bash
+curl -X POST http://localhost:8082/api/trades \
+	-H "Content-Type: application/json" \
+	-d '{"tradeId":"T-123","accountNumber":"12345","accountName":"Alice","amount":1000.0,"currency":"USD","tradeType":"BUY"}'
+```
+
+Get a canonical trade by id
+
+```bash
+curl http://localhost:8082/api/trades/{id}
+```
+
+Upload a file of trades (CSV or JSON)
+
+```bash
+curl -X POST "http://localhost:8082/api/trades/upload?skipHeader=true" \
+	-F "file=@trades.csv"
+```
+
+These examples assume the app is running locally with the `dev` profile. If you changed the port or host, update the URLs accordingly.
+
+Sample data files
+-----------------
+
+I added example requests and expected responses under `sample-data/`. Use these files when testing locally or crafting requests for the API:
+
+- `sample-data/requests/ingest-trade.json` — JSON body for POST `/api/trades`
+- `sample-data/requests/upload-trades.csv` — CSV file for POST `/api/trades/upload`
+- `sample-data/requests/openapi-sample-request.json` — tiny pointer file listing API paths
+- `sample-data/expected/ingest-trade-response.txt` — example status/body for POST `/api/trades`
+- `sample-data/expected/get-trade-response.json` — example canonical trade returned by GET `/api/trades/{id}`
+
+You can view them directly in this repo or use them with `curl`/`http` clients. For example:
+
+```bash
+curl -X POST http://localhost:8082/api/trades \
+	-H "Content-Type: application/json" \
+	--data-binary @sample-data/requests/ingest-trade.json
+```
