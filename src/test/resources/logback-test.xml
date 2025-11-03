@@ -1,0 +1,21 @@
+<configuration>
+    <!-- Use Spring Boot's default appenders so test output format matches application -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Root logger for tests -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+    <!-- Reduce noisy Kafka client logging during tests -->
+    <logger name="org.apache.kafka.clients.NetworkClient" level="ERROR" />
+    <logger name="org.apache.kafka.clients.consumer.internals.Fetcher" level="ERROR" />
+    <logger name="org.apache.kafka.clients" level="WARN" />
+
+    <!-- Testcontainers can be chatty; keep it at WARN in tests -->
+    <logger name="org.testcontainers" level="WARN" />
+    <logger name="com.github.dockerjava" level="WARN" />
+
+    <!-- Keep application logs visible at INFO during tests -->
+</configuration>

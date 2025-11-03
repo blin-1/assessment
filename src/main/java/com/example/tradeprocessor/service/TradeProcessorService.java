@@ -3,6 +3,7 @@ package com.example.tradeprocessor.service;
 import com.example.tradeprocessor.model.AccountingTrade;
 import com.example.tradeprocessor.model.CanonicalTrade;
 import com.example.tradeprocessor.model.InputTrade;
+import com.example.tradeprocessor.util.InputSanitizer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -17,7 +18,6 @@ import org.springframework.cache.CacheManager;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class TradeProcessorService {
@@ -195,15 +195,15 @@ public class TradeProcessorService {
     }
 
     private void applyTransformations(CanonicalTrade c) {
-        // obfuscate account number
+        // obfuscate account number using centralized sanitizer
         var acc = c.getAccountNumber();
-        if (acc != null && acc.length() > 4) {
-            c.setAccountNumber(maskAccount(acc));
+        if (acc != null && acc.length() > 0) {
+            c.setAccountNumber(InputSanitizer.maskAccount(acc));
         }
-        // redact account name (keep initials)
+        // redact account name (keep initials) using centralized sanitizer
         var name = c.getAccountName();
         if (name != null && !name.isBlank()) {
-            c.setAccountName(redactName(name));
+            c.setAccountName(InputSanitizer.redactName(name));
         }
         // normalize security id: uppercase and validate
         var sec = c.getSecurityId();
@@ -272,29 +272,5 @@ public class TradeProcessorService {
         }
     }
 
-    private String maskAccount(String a) {
-        // Mask first 4 characters with asterisks, keep the rest
-        int mask = 4;
-        int len = a.length();
-        if (len <= mask) {
-            // If account is 4 chars or less, mask all
-            return "*".repeat(len);
-        }
-        var sb = new StringBuilder();
-        for (int i = 0; i < mask; i++) sb.append('*');
-        sb.append(a.substring(mask));
-        return sb.toString();
-    }
-
-    private String redactName(String name) {
-        // keep initials and replace rest with *
-        var parts = name.trim().split("\\s+");
-        var sb = new StringBuilder();
-        for (var p : parts) {
-            if (p.length() > 0) {
-                sb.append(p.charAt(0)).append(".");
-            }
-        }
-        return sb.toString();
-    }
+    // Masking and redaction delegated to InputSanitizer for a single source of truth
 }
