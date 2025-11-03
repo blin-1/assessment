@@ -23,7 +23,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
+
 @RestController
+@Tag(name = "Trades", description = "APIs to ingest and retrieve trades")
 @RequestMapping("/api/trades")
 public class TradeController {
     private final TradeProcessorService service;
@@ -36,14 +45,24 @@ public class TradeController {
         this.validator = validator;
     }
 
+    @Operation(summary = "Ingest a single trade", description = "Accepts a JSON payload describing a trade and returns the canonical trade id when created")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Created" , content = @Content(schema = @Schema(implementation = String.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content)
+    })
     @PostMapping(consumes = "application/json")
-    public ResponseEntity<String> ingest(@Valid @RequestBody InputTrade trade) {
+    public ResponseEntity<String> ingest(@Valid @org.springframework.web.bind.annotation.RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Trade to ingest", required = true, content = @Content(schema = @Schema(implementation = InputTrade.class))) InputTrade trade) {
         var id = service.processSync(trade);
         return ResponseEntity.status(HttpStatus.CREATED).body(id);
     }
 
+    @Operation(summary = "Upload a file of trades", description = "Accepts CSV or JSON files (or newline-delimited JSON) and ingests each record")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "Accepted", content = @Content),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request", content = @Content)
+    })
     @PostMapping(path = "/upload", consumes = "multipart/form-data")
-    public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
+    public ResponseEntity<Object> uploadFile(@Parameter(description = "File containing trades (CSV or JSON)") @RequestParam("file") MultipartFile file) throws IOException {
         var text = new String(file.getBytes());
         List<InputTrade> trades = new ArrayList<>();
         String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
@@ -132,8 +151,13 @@ public class TradeController {
         return ResponseEntity.accepted().body(resp);
     }
 
+    @Operation(summary = "Get canonical trade by id", description = "Returns the canonical representation of a previously ingested trade")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = CanonicalTrade.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Not found", content = @Content)
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<CanonicalTrade> get(@PathVariable String id) {
+    public ResponseEntity<CanonicalTrade> get(@Parameter(description = "Canonical id of the trade to retrieve", required = true) @PathVariable String id) {
         var c = service.getCanonical(id);
         if (c == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(c);
