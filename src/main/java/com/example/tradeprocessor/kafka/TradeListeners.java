@@ -6,15 +6,15 @@ import com.example.tradeprocessor.util.InputSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import java.util.Set;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class TradeListeners {
-    private static final Logger log = LoggerFactory.getLogger(TradeListeners.class);
 
     private final TradeProcessorService service;
     private final ObjectMapper objectMapper;
@@ -45,7 +45,7 @@ public class TradeListeners {
 
             // Validate input explicitly and reject if constraints fail
             if (validator != null) {
-                java.util.Set<ConstraintViolation<InputTrade>> violations = validator.validate(input);
+                Set<ConstraintViolation<InputTrade>> violations = validator.validate(input);
                 if (!violations.isEmpty()) {
                     var sb = new StringBuilder();
                     for (var v : violations) {

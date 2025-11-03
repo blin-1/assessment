@@ -9,6 +9,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 
 import com.example.tradeprocessor.model.CanonicalTrade;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,7 +22,7 @@ public class TradeProcessorServiceTest {
     @BeforeEach
     void setUp() {
         kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
         // provide a real in-memory CacheManager so the service writes to the canonicalStore cache
         cacheManager = new ConcurrentMapCacheManager("canonicalStore");

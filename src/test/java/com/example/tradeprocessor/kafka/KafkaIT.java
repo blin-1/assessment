@@ -21,6 +21,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -57,7 +58,7 @@ public class KafkaIT {
         var adminProps = new Properties();
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         // convert Properties -> Map<String,Object> for AdminClient.create
-        var adminConfig = new java.util.HashMap<String, Object>();
+    var adminConfig = new HashMap<String, Object>();
         for (String name : adminProps.stringPropertyNames()) {
             adminConfig.put(name, adminProps.getProperty(name));
         }

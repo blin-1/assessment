@@ -3,6 +3,7 @@ package com.example.tradeprocessor.util;
 import com.example.tradeprocessor.model.InputTrade;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.Iterator;
 
@@ -66,7 +67,7 @@ public final class InputSanitizer {
 
     private static void maskField(JsonNode node, String field) {
         if (node == null || !node.isObject()) return;
-        var obj = (com.fasterxml.jackson.databind.node.ObjectNode) node;
+    var obj = (ObjectNode) node;
         if (obj.has(field) && obj.get(field).isTextual()) {
             var original = obj.get(field).asText();
             obj.put(field, maskAccount(original));

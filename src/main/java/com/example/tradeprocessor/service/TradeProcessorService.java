@@ -6,8 +6,7 @@ import com.example.tradeprocessor.model.InputTrade;
 import com.example.tradeprocessor.util.InputSanitizer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -18,10 +17,12 @@ import org.springframework.cache.CacheManager;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 public class TradeProcessorService {
-    private static final Logger log = LoggerFactory.getLogger(TradeProcessorService.class);
     // Use Spring Cache abstraction to store canonical records in-memory for auditing/retry.
     // The cache name used is "canonicalStore" and defaults to a ConcurrentMap-backed cache
     // when Spring Cache is enabled and no other CacheManager is configured.
@@ -74,8 +75,8 @@ public class TradeProcessorService {
         //   "platform_id": "<raw account number>",
         //   "trade": { "account": "<obfuscated>", "security": "<SEC>", "type": "B|S", "amount": <num>, "timestamp": "ISO_INSTANT" }
         // }
-        var instrMap = new java.util.LinkedHashMap<String, Object>();
-        var tradeMap = new java.util.LinkedHashMap<String, Object>();
+    var instrMap = new LinkedHashMap<String, Object>();
+    var tradeMap = new LinkedHashMap<String, Object>();
         tradeMap.put("account", canonical.getAccountNumber());
         tradeMap.put("security", canonical.getSecurityId());
         tradeMap.put("type", canonical.getTradeType());
@@ -95,13 +96,13 @@ public class TradeProcessorService {
             // In test mode block briefly to ensure the records are actually sent (makes tests deterministic)
             try {
                 if (futureOut != null) {
-                    var result = futureOut.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    var result = futureOut.get(10, TimeUnit.SECONDS);
                     var meta = result.getRecordMetadata();
                     log.info("Processed trade {} -> published to {} (partition={}, offset={})",
                             canonical.getId(), outputTopic, meta.partition(), meta.offset());
                 }
                 if (futureInstr != null) {
-                    var result2 = futureInstr.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    var result2 = futureInstr.get(10, TimeUnit.SECONDS);
                     var meta2 = result2.getRecordMetadata();
                     log.info("Processed trade {} -> published to {} (partition={}, offset={})",
                             canonical.getId(), instructionsOutboundTopic, meta2.partition(), meta2.offset());
