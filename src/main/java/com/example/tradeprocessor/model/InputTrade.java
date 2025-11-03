@@ -1,41 +1,49 @@
 package com.example.tradeprocessor.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
-
 import java.time.Instant;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Schema(name = "InputTrade", description = "Incoming trade payload")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class InputTrade {
-    @NotBlank(message = "tradeId is required")
-    private String tradeId;
+  @NotBlank(message = "tradeId is required")
+  @Schema(description = "Client trade identifier", example = "T-123")
+  private String tradeId;
 
-    @NotBlank(message = "accountNumber is required")
-    private String accountNumber;
+  @NotBlank(message = "accountNumber is required")
+  @Schema(description = "Account number (sensitive - will be masked in logs)", example = "****5678")
+  private String accountNumber;
 
-    @NotBlank(message = "accountName is required")
-    private String accountName;
+  @NotBlank(message = "accountName is required")
+  @Schema(description = "Account holder name", example = "Alice B")
+  private String accountName;
 
-    @Positive(message = "amount must be greater than 0")
-    private double amount;
+  @Positive(message = "amount must be greater than 0")
+  @Schema(description = "Trade amount", example = "1000.00")
+  private double amount;
 
-    @NotBlank(message = "currency is required")
-    private String currency;
+  @NotBlank(message = "currency is required")
+  @Schema(description = "Currency code (ISO 4217)", example = "USD")
+  private String currency;
 
-    // optional - if missing we will set server time
-    private Instant tradeDate;
+  // optional - if missing we will set server time
+  @Schema(description = "Trade timestamp (ISO-8601)")
+  private Instant tradeDate;
 
-    public String getTradeId() { return tradeId; }
-    public void setTradeId(String tradeId) { this.tradeId = tradeId; }
-    public String getAccountNumber() { return accountNumber; }
-    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
-    public String getAccountName() { return accountName; }
-    public void setAccountName(String accountName) { this.accountName = accountName; }
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
-    public String getCurrency() { return currency; }
-    public void setCurrency(String currency) { this.currency = currency; }
-    public Instant getTradeDate() { return tradeDate; }
-    public void setTradeDate(Instant tradeDate) { this.tradeDate = tradeDate; }
+  @Schema(description = "Security identifier", example = "AAPL")
+  private String securityId;
+
+  @Schema(description = "Trade type", example = "BUY")
+  private String tradeType;
 }

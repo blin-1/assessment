@@ -1,0 +1,22 @@
+spring:
+  # Default profile fallback when none is provided. Set explicitly with -Dspring.profiles.active
+  profiles:
+    default: dev
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+app:
+  input-topic: trades-input
+  output-topic: trades-output
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# configure prometheus scraping endpoint path (default /actuator/prometheus)
+management.endpoints.web.base-path: /actuator

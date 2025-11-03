@@ -1,0 +1,10 @@
+app:
+  env: prod
+  description: "Production environment settings — override secrets via environment or external config"
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO

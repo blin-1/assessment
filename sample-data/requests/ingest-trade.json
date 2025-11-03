@@ -1,0 +1,10 @@
+{
+  "tradeId": "T-123",
+  "accountNumber": "12345",
+  "accountName": "Alice B",
+  "amount": 1000.0,
+  "currency": "USD",
+  "tradeDate": "2025-11-02T15:30:00Z",
+  "securityId": "AAPL",
+  "tradeType": "BUY"
+}

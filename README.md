@@ -4,6 +4,10 @@
 
 This project is built with Maven and targets Java 21 bytecode level.
 
+Default Spring profile
+
+When no Spring profile is supplied, this project falls back to the `dev` profile by default (see `src/main/resources/application.yml`). You can still override the active profile with a Maven profile (for example `-Pdev`) or by setting the JVM/system property `-Dspring.profiles.active=qa`.
+
 The development machine used for verification in this repository has Oracle JDK 23 installed. You can build and test the project using that JDK while still compiling for Java 21 by using the Maven Compiler Plugin's `release` option (already configured in `pom.xml`).
 
 Local (Git Bash / WSL) quick-start
@@ -40,3 +44,152 @@ CI status
 CI extras
 
 The workflow runs a matrix across Java 21 and Java 23 to validate both the target bytecode level (21) and the developer/runtime (23). Artifacts produced by each matrix cell are retained for 7 days and named with the Java version for easy retrieval.
+
+Docker & Kubernetes
+
+Build a container locally (example using Docker Desktop):
+
+```bash
+export JAVA_HOME="/c/Program Files/Java/jdk-23"
+export PATH="$JAVA_HOME/bin:$PATH"
+mvn -DskipTests package
+docker build -t ghcr.io/owner/assessment:latest .
+```
+
+Deploy to a Kubernetes cluster (example):
+
+```bash
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+```
+
+Notes:
+- The Kubernetes manifests assume a container image is available at `ghcr.io/owner/assessment:latest`. Replace the image with your registry and tag.
+- Prometheus scrape annotations are added to the Pod template to make metrics (Actuator Prometheus) discoverable.
+
+Integration tests (Kafka / Testcontainers)
+
+Integration tests in this project are implemented as IT classes (naming pattern: `*IT.java`) and are executed by the Maven Failsafe plugin during the `verify` phase. This keeps the fast `mvn test` run focused on unit tests (Surefire) while running longer Testcontainers-based end-to-end tests only when explicitly requested (for example in a CI integration job).
+
+Local requirements
+- Docker Desktop (or another Docker runtime) accessible to Testcontainers
+- Sufficient memory for Kafka containers (2GB+ recommended)
+
+Run integration tests locally
+
+- Run the full verify lifecycle, which executes Failsafe ITs:
+
+```bash
+mvn verify
+```
+
+- Run a single IT class via Failsafe (example `KafkaIT`):
+
+```bash
+mvn -Dit.test=KafkaIT verify
+```
+
+Run unit tests only (fast)
+
+```bash
+mvn test
+```
+
+CI guidance
+
+- Run unit tests in a fast job using `mvn test`.
+- Run integration tests in a separate job that has Docker available and executes `mvn verify` (Failsafe will pick up `*IT.java` classes). Example: use a self-hosted or Docker-enabled runner for the integration job.
+
+Example GitHub Actions snippet (integration job using `mvn verify`):
+
+```yaml
+integration-tests:
+  runs-on: self-hosted # or a runner with Docker available
+  steps:
+	- uses: actions/checkout@v4
+	- name: Set up JDK
+	  uses: actions/setup-java@v4
+	  with:
+		java-version: '23'
+	- name: Run integration tests (Failsafe)
+	  run: mvn verify
+```
+
+If you want, I can add or adapt CI workflow files so unit and integration tests are split into separate jobs (fast unit-test job vs. Docker-enabled integration job).
+
+Local API quick examples
+------------------------
+
+The development profile binds the app to port 8082 by default. Replace the host/port if you run with a different profile or override `server.port`.
+
+Health check
+
+```bash
+curl http://localhost:8082/actuator/health
+```
+
+OpenAPI / Swagger JSON
+
+```bash
+curl http://localhost:8082/v3/api-docs
+```
+
+Ingest a single trade (JSON)
+
+```bash
+curl -X POST http://localhost:8082/api/trades \
+	-H "Content-Type: application/json" \
+	-d '{"tradeId":"T-123","accountNumber":"12345","accountName":"Alice","amount":1000.0,"currency":"USD","tradeType":"BUY"}'
+```
+
+Get a canonical trade by id
+
+```bash
+curl http://localhost:8082/api/trades/{id}
+```
+
+Upload a file of trades (CSV or JSON)
+
+```bash
+curl -X POST "http://localhost:8082/api/trades/upload?skipHeader=true" \
+	-F "file=@trades.csv"
+```
+
+These examples assume the app is running locally with the `dev` profile. If you changed the port or host, update the URLs accordingly.
+
+Sample data files
+-----------------
+
+I added example requests and expected responses under `sample-data/`. Use these files when testing locally or crafting requests for the API:
+
+- `sample-data/requests/ingest-trade.json` — JSON body for POST `/api/trades`
+- `sample-data/requests/upload-trades.csv` — CSV file for POST `/api/trades/upload`
+- `sample-data/requests/openapi-sample-request.json` — tiny pointer file listing API paths
+- `sample-data/expected/ingest-trade-response.txt` — example status/body for POST `/api/trades`
+- `sample-data/expected/get-trade-response.json` — example canonical trade returned by GET `/api/trades/{id}`
+
+You can view them directly in this repo or use them with `curl`/`http` clients. For example:
+
+```bash
+curl -X POST http://localhost:8082/api/trades \
+	-H "Content-Type: application/json" \
+	--data-binary @sample-data/requests/ingest-trade.json
+```
+
+Security notes
+--------------
+
+**Development profile (`dev`):**
+- API endpoints (`/api/**`) are accessible without authentication for easier local testing and Swagger UI interaction.
+- Actuator health endpoint is always public.
+- Swagger UI and OpenAPI docs are always public.
+
+**Other profiles (qa, prod):**
+- API endpoints require a valid JWT bearer token (OAuth2 resource server).
+- Configure `spring.security.oauth2.resourceserver.jwt.jwk-set-uri` in your application properties to point to a real JWKS endpoint.
+- The permissive `JwtDecoder` bean (accepts any token) is only active when no other `JwtDecoder` is configured. In production, provide a proper JwtDecoder via Spring Security OAuth2 configuration.
+
+**Swagger UI:**
+- Access at: http://localhost:8082/swagger-ui/index.html
+- In dev profile: no authentication required (try endpoints directly)
+- In other profiles: click "Authorize" and enter a valid JWT bearer token

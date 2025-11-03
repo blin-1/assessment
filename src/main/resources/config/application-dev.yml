@@ -1,0 +1,10 @@
+app:
+  env: dev
+  description: "Development environment settings"
+
+server:
+  port: 8082
+
+logging:
+  level:
+    root: INFO

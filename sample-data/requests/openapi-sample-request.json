@@ -1,0 +1,8 @@
+{
+  "paths": [
+    "/api/trades",
+    "/api/trades/upload",
+    "/api/trades/{id}"
+  ],
+  "note": "This file is a tiny reference for the available API paths; use the OpenAPI JSON at /v3/api-docs for the full spec."
+}
