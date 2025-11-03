@@ -4,11 +4,19 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 import java.time.Instant;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(name = "InputTrade", description = "Incoming trade payload")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class InputTrade {
     @NotBlank(message = "tradeId is required")
     @Schema(description = "Client trade identifier", example = "T-123")
@@ -37,21 +45,4 @@ public class InputTrade {
     private String securityId;
     @Schema(description = "Trade type", example = "BUY")
     private String tradeType;
-
-    public String getTradeId() { return tradeId; }
-    public void setTradeId(String tradeId) { this.tradeId = tradeId; }
-    public String getAccountNumber() { return accountNumber; }
-    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
-    public String getAccountName() { return accountName; }
-    public void setAccountName(String accountName) { this.accountName = accountName; }
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
-    public String getCurrency() { return currency; }
-    public void setCurrency(String currency) { this.currency = currency; }
-    public Instant getTradeDate() { return tradeDate; }
-    public void setTradeDate(Instant tradeDate) { this.tradeDate = tradeDate; }
-    public String getSecurityId() { return securityId; }
-    public void setSecurityId(String securityId) { this.securityId = securityId; }
-    public String getTradeType() { return tradeType; }
-    public void setTradeType(String tradeType) { this.tradeType = tradeType; }
 }
