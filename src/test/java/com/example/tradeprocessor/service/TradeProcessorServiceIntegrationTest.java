@@ -5,5 +5,5 @@
 package com.example.tradeprocessor.service;
 
 public class TradeProcessorServiceIntegrationTest {
-    // intentionally left blank
+  // intentionally left blank
 }

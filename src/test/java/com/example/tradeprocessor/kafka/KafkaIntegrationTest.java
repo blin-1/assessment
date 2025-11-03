@@ -5,5 +5,5 @@
 package com.example.tradeprocessor.kafka;
 
 public class KafkaIntegrationTest {
-    // intentionally left blank
+  // intentionally left blank
 }

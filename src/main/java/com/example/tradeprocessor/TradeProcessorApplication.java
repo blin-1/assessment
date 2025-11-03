@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 @EnableCaching
 public class TradeProcessorApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(TradeProcessorApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(TradeProcessorApplication.class, args);
+  }
 }
