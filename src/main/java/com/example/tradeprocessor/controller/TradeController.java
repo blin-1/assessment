@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,8 +72,10 @@ public class TradeController {
         @Parameter(description = "File containing trades (CSV or JSON)") @RequestParam("file") MultipartFile file,
         @Parameter(description = "When true, the first CSV record will be treated as header and skipped from data rows") @RequestParam(value = "skipHeader", required = false) Boolean skipHeader
     ) throws IOException {
-        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+    String rawFilename = file.getOriginalFilename();
+    String filename = rawFilename == null ? "" : rawFilename.toLowerCase();
+    String rawContentType = file.getContentType();
+    String contentType = rawContentType == null ? "" : rawContentType.toLowerCase();
         boolean isCsv = filename.endsWith(".csv") || contentType.contains("csv");
 
         var accepted = new ArrayList<String>();
@@ -111,7 +114,7 @@ public class TradeController {
                         if (v != null && !v.isBlank()) t.setCurrency(stripQuotes(v));
 
                         v = csvValue(record, headerMap, "tradeDate", "trade_date", "tradedate");
-                        if (v != null && !v.isBlank()) t.setTradeDate(java.time.Instant.parse(stripQuotes(v)));
+                        if (v != null && !v.isBlank()) t.setTradeDate(Instant.parse(stripQuotes(v)));
 
                         Set<ConstraintViolation<InputTrade>> violations = validator.validate(t);
                         if (violations.isEmpty()) {

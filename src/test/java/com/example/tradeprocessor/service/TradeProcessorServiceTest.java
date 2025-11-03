@@ -10,6 +10,7 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 
 import com.example.tradeprocessor.model.CanonicalTrade;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,8 +21,9 @@ public class TradeProcessorServiceTest {
     private CacheManager cacheManager;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
-        kafkaTemplate = Mockito.mock(KafkaTemplate.class);
+        kafkaTemplate = (KafkaTemplate<String, String>) Mockito.mock(KafkaTemplate.class);
     var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
         // provide a real in-memory CacheManager so the service writes to the canonicalStore cache
@@ -47,9 +49,9 @@ public class TradeProcessorServiceTest {
     // also assert the cache contains the same object
     var cache = cacheManager.getCache("canonicalStore");
     assertThat(cache).isNotNull();
-    var cached = cache.get(id, CanonicalTrade.class);
+    var cached = Objects.requireNonNull(cache).get(Objects.requireNonNull(id), CanonicalTrade.class);
     assertThat(cached).isNotNull();
-    assertThat(cached.getId()).isEqualTo(id);
+    assertThat(Objects.requireNonNull(cached).getId()).isEqualTo(id);
         assertThat(canonical.getAccountNumber()).contains("*");
         assertThat(canonical.getAccountName()).contains(".");
     }
