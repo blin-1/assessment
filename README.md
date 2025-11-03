@@ -175,3 +175,21 @@ curl -X POST http://localhost:8082/api/trades \
 	-H "Content-Type: application/json" \
 	--data-binary @sample-data/requests/ingest-trade.json
 ```
+
+Security notes
+--------------
+
+**Development profile (`dev`):**
+- API endpoints (`/api/**`) are accessible without authentication for easier local testing and Swagger UI interaction.
+- Actuator health endpoint is always public.
+- Swagger UI and OpenAPI docs are always public.
+
+**Other profiles (qa, prod):**
+- API endpoints require a valid JWT bearer token (OAuth2 resource server).
+- Configure `spring.security.oauth2.resourceserver.jwt.jwk-set-uri` in your application properties to point to a real JWKS endpoint.
+- The permissive `JwtDecoder` bean (accepts any token) is only active when no other `JwtDecoder` is configured. In production, provide a proper JwtDecoder via Spring Security OAuth2 configuration.
+
+**Swagger UI:**
+- Access at: http://localhost:8082/swagger-ui/index.html
+- In dev profile: no authentication required (try endpoints directly)
+- In other profiles: click "Authorize" and enter a valid JWT bearer token
